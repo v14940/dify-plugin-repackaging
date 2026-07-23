@@ -2,11 +2,16 @@
 ### How To Use With Github Action
 1. Fork this repository
 2. Open the GitHub page of your forked repository
-[https://github.com/{your_username}/dify-sandbox-python-requirements-download]()
-3. Run workflow
+`https://github.com/{your_username}/dify-plugin-repackaging`
+3. Open **Actions** > **Repackage Dify Plugin** > **Run workflow**
+4. Fill in the Dify Marketplace plugin information:
+	- `plugin_author`: plugin author, for example `langgenius`
+	- `plugin_name`: plugin name, for example `agent`
+	- `plugin_version`: plugin version, for example `0.0.9`
+	- `platform_arm`: select ARM/aarch64 output when enabled; otherwise amd64 output is generated
+5. Download the generated `.difypkg` artifact from the workflow run
 ![run_github_action_1](images/run_github_action_1.png)
 ![run_github_action_2](images/run_github_action_2.png)
-4. Download artifact
 ![run_github_action_3](images/run_github_action_3.png)
 
 ### How To Use With Docker

@@ -1,0 +1,46 @@
+name: Download Dify Plugin Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      plugin_author:
+        description: "plugin author"
+        required: true
+        type: string
+      plugin_name:
+        description: "plugin name"
+        required: true
+        type: string
+      plugin_version:
+        description: "plugin version"
+        required: true
+        type: string
+
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve package information
+        run: |
+          PACKAGE_NAME="${{ inputs.plugin_author }}-${{ inputs.plugin_name }}_${{ inputs.plugin_version }}.difypkg"
+          DOWNLOAD_URL="https://marketplace.dify.ai/api/v1/plugins/${{ inputs.plugin_author }}/${{ inputs.plugin_name }}/${{ inputs.plugin_version }}/download"
+
+          echo "PACKAGE_NAME=$PACKAGE_NAME" >> "$GITHUB_ENV"
+          echo "DOWNLOAD_URL=$DOWNLOAD_URL" >> "$GITHUB_ENV"
+
+      - name: Download difypkg
+        run: |
+          echo "Downloading $DOWNLOAD_URL"
+          curl --fail --location --show-error --output "$PACKAGE_NAME" "$DOWNLOAD_URL"
+
+          if [ ! -s "$PACKAGE_NAME" ]; then
+            echo "Downloaded package is empty: $PACKAGE_NAME"
+            exit 1
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE_NAME }}
+          path: ${{ env.PACKAGE_NAME }}
+          if-no-files-found: error
