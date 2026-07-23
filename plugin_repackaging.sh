@@ -231,6 +231,11 @@ import sys
 print(f"{sys.version_info.major}.{sys.version_info.minor}")
 PY
 )
+	PIP_TARGET_PYTHON=""
+	if [[ -n "$PIP_PLATFORM" ]]; then
+		PIP_TARGET_ABI="cp${UV_PY_VERSION/.}"
+		PIP_TARGET_PYTHON="--python-version ${UV_PY_VERSION} --implementation cp --abi ${PIP_TARGET_ABI}"
+	fi
 
 	# Determine uv target platform to avoid cross-platform dependency conflicts
 	local UV_PLATFORM=""
@@ -333,7 +338,7 @@ PY
 
 	mkdir -p ./wheels
 	echo "Downloading wheels to ./wheels/..."
-	${PIP_CMD} download ${PIP_PLATFORM} --prefer-binary -r requirements.txt -d ./wheels \
+	${PIP_CMD} download ${PIP_PLATFORM} ${PIP_TARGET_PYTHON} --prefer-binary -r requirements.txt -d ./wheels \
 		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
 	if [[ $? -ne 0 ]]; then
 		echo "✗ Error: Failed to download dependencies"
