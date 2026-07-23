@@ -28,6 +28,28 @@ RAW_PLATFORM=""    # raw value from -p, e.g. manylinux2014_x86_64
 PACKAGE_SUFFIX="offline"
 PRERELEASE_ALLOW=0
 
+build_pip_platform_args() {
+	local platform="$1"
+	local args="--platform ${platform}"
+
+	case "$platform" in
+		manylinux2014_x86_64)
+			args="$args --platform manylinux_2_28_x86_64"
+			;;
+		manylinux_2_28_x86_64)
+			args="$args --platform manylinux2014_x86_64"
+			;;
+		manylinux2014_aarch64)
+			args="$args --platform manylinux_2_28_aarch64"
+			;;
+		manylinux_2_28_aarch64)
+			args="$args --platform manylinux2014_aarch64"
+			;;
+	esac
+
+	echo "$args --only-binary=:all:"
+}
+
 market(){
 	if [[ -z "$2" || -z "$3" || -z "$4" ]]; then
 		echo ""
@@ -422,7 +444,7 @@ print_usage() {
 
 while getopts "p:s:R" opt; do
 	case "$opt" in
-		p) RAW_PLATFORM="${OPTARG}"; PIP_PLATFORM="--platform ${OPTARG} --only-binary=:all:" ;;
+		p) RAW_PLATFORM="${OPTARG}"; PIP_PLATFORM="$(build_pip_platform_args "${OPTARG}")" ;;
 		s) PACKAGE_SUFFIX="${OPTARG}" ;;
 		R) PRERELEASE_ALLOW=1 ;;
 		*) print_usage; exit 1 ;;
