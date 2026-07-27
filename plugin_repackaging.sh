@@ -200,6 +200,19 @@ repackage(){
 		echo "Injected [tool.uv] into $PYFILE"
 	}
 
+	remove_dev_dependency_groups_from_pyproject() {
+		local PYFILE="$1"
+		[ -f "$PYFILE" ] || return 0
+		awk '
+			BEGIN { in_groups=0; removed=0 }
+			/^[ \t]*\[dependency-groups\][ \t]*$/ { in_groups=1; removed=1; next }
+			{ if (in_groups && $0 ~ /^[ \t]*\[/) { in_groups=0 } }
+			{ if (!in_groups) print }
+			END { if (removed) exit 0 }
+		' "$PYFILE" > "$PYFILE.tmp" && mv "$PYFILE.tmp" "$PYFILE"
+		echo "Removed [dependency-groups] from $PYFILE for runtime-only offline installation"
+	}
+
 	if python3 -m pip --version &> /dev/null 2>&1; then
 		PIP_CMD="python3 -m pip"
 	elif command -v pip &> /dev/null && pip --version &> /dev/null 2>&1; then
@@ -390,6 +403,10 @@ PY
 	if [ -f "uv.lock" ]; then
 		rm -f uv.lock
 		echo "✓ Removed uv.lock to avoid locked remote artifacts in offline package"
+	fi
+
+	if [ -f "pyproject.toml" ]; then
+		remove_dev_dependency_groups_from_pyproject "pyproject.toml"
 	fi
 
 	# ============================================
