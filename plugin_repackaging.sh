@@ -176,15 +176,24 @@ repackage(){
 	# Inject [tool.uv] config into pyproject.toml (runtime will use local wheels offline)
 	inject_uv_into_pyproject() {
 		local PYFILE="$1"
+		local ENV_MARKER="$2"
 		[ -f "$PYFILE" ] || return 0
-	awk '
-		BEGIN { in_uv=0; saw_uv=0; saw_no=0; saw_find=0; saw_pre=0 }
-		function print_missing(){ if (!saw_no) print "no-index = true"; if (!saw_find) print "find-links = [\"./wheels\"]"; if (!saw_pre) print "prerelease = \"allow\"" }
-		/^[ \t]*\[tool\.uv\][ \t]*$/ { saw_uv=1; in_uv=1; saw_no=0; saw_find=0; saw_pre=0; print; next }
+	awk -v env_marker="$ENV_MARKER" '
+		BEGIN { in_uv=0; saw_uv=0; saw_no=0; saw_find=0; saw_pre=0; saw_env=0; saw_groups=0 }
+		function print_missing(){
+			if (!saw_no) print "no-index = true"
+			if (!saw_find) print "find-links = [\"./wheels\"]"
+			if (!saw_pre) print "prerelease = \"allow\""
+			if (!saw_groups) print "default-groups = []"
+			if (env_marker != "" && !saw_env) print "environments = [\"" env_marker "\"]"
+		}
+		/^[ \t]*\[tool\.uv\][ \t]*$/ { saw_uv=1; in_uv=1; saw_no=0; saw_find=0; saw_pre=0; saw_env=0; saw_groups=0; print; next }
 		{ if (in_uv && $0 ~ /^[ \t]*\[/) { print_missing(); in_uv=0 } }
 		{ if (in_uv && $0 ~ /^[ \t]*no-index[ \t]*=/) { print "no-index = true"; saw_no=1; next } }
 		{ if (in_uv && $0 ~ /^[ \t]*find-links[ \t]*=/) { print "find-links = [\"./wheels\"]"; saw_find=1; next } }
 		{ if (in_uv && $0 ~ /^[ \t]*prerelease[ \t]*=/) { print "prerelease = \"allow\""; saw_pre=1; next } }
+		{ if (in_uv && $0 ~ /^[ \t]*default-groups[ \t]*=/) { print "default-groups = []"; saw_groups=1; next } }
+		{ if (in_uv && $0 ~ /^[ \t]*environments[ \t]*=/) { if (env_marker != "") print "environments = [\"" env_marker "\"]"; saw_env=1; next } }
 		{ print }
 		END {
 			if (in_uv) { print_missing() }
@@ -194,6 +203,8 @@ repackage(){
 				print "no-index = true"
 				print "find-links = [\"./wheels\"]"
 				print "prerelease = \"allow\""
+				print "default-groups = []"
+				if (env_marker != "") print "environments = [\"" env_marker "\"]"
 			}
 		}
 		' "$PYFILE" > "$PYFILE.tmp" && mv "$PYFILE.tmp" "$PYFILE"
@@ -326,7 +337,13 @@ PY
 	# Inject [tool.uv] config to enable offline wheel usage
 	if [ -f "pyproject.toml" ]; then
 		echo "Found pyproject.toml, injecting [tool.uv] configuration..."
-		inject_uv_into_pyproject "pyproject.toml"
+		UV_ENVIRONMENT_MARKER=""
+		case "$UV_PLATFORM" in
+			linux) UV_ENVIRONMENT_MARKER="sys_platform == 'linux'" ;;
+			macos) UV_ENVIRONMENT_MARKER="sys_platform == 'darwin'" ;;
+			windows) UV_ENVIRONMENT_MARKER="sys_platform == 'win32'" ;;
+		esac
+		inject_uv_into_pyproject "pyproject.toml" "$UV_ENVIRONMENT_MARKER"
 	fi
 
 	if [ -f "pyproject.toml" ] && [ ! -f "requirements.txt" ]; then
