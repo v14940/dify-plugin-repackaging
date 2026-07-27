@@ -387,6 +387,11 @@ PY
 	fi
 	echo "✓ requirements.txt updated for offline mode"
 
+	if [ -f "uv.lock" ]; then
+		rm -f uv.lock
+		echo "✓ Removed uv.lock to avoid locked remote artifacts in offline package"
+	fi
+
 	# ============================================
 	# Step 5: Package the plugin
 	# ============================================
