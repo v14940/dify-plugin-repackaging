@@ -390,9 +390,51 @@ PY
 
 	mkdir -p ./wheels
 	echo "Downloading wheels to ./wheels/..."
+	DOWNLOAD_LOG=$(mktemp)
+	set +e
 	${PIP_CMD} download ${PIP_PLATFORM} ${PIP_TARGET_PYTHON} --prefer-binary -r requirements.txt -d ./wheels \
-		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
-	if [[ $? -ne 0 ]]; then
+		--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com 2>&1 | tee "${DOWNLOAD_LOG}"
+	DOWNLOAD_STATUS=${PIPESTATUS[0]}
+	set -e
+
+	if [[ ${DOWNLOAD_STATUS} -ne 0 ]]; then
+		# Detect sdist-only packages that fail under --only-binary=:all:
+		SDIST_ONLY_PKGS=$(grep -Eo "No matching distribution found for [A-Za-z0-9_.-]+" "${DOWNLOAD_LOG}" \
+			| awk '{print $NF}' | sort -u)
+
+		if [[ -n "${SDIST_ONLY_PKGS}" && -n "${PIP_PLATFORM}" ]]; then
+			echo ""
+			echo "⚠ Detected sdist-only packages missing pre-built wheels:"
+			echo "${SDIST_ONLY_PKGS}" | sed 's/^/  - /'
+			echo "Attempting local wheel build for these packages (pure-Python sdists only)..."
+
+			BUILD_FAILED=0
+			for PKG in ${SDIST_ONLY_PKGS}; do
+				PKG_SPEC=$(grep -iE "^${PKG}([[:space:]]*[<>=!~]|$)" requirements.txt | head -n1)
+				[ -z "${PKG_SPEC}" ] && PKG_SPEC="${PKG}"
+
+				# Build wheel locally with no cross-platform constraint, no deps
+				${PIP_CMD} wheel --no-deps --no-binary=:none: -w ./wheels "${PKG_SPEC}" \
+					--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com
+				if [[ $? -ne 0 ]]; then
+					echo "✗ Error: Failed to build wheel locally for ${PKG_SPEC}"
+					BUILD_FAILED=1
+					break
+				fi
+			done
+
+			if [[ ${BUILD_FAILED} -eq 0 ]]; then
+				echo "Retrying dependency download with locally built wheels available..."
+				${PIP_CMD} download ${PIP_PLATFORM} ${PIP_TARGET_PYTHON} --prefer-binary -r requirements.txt -d ./wheels \
+					--index-url ${PIP_MIRROR_URL} --trusted-host mirrors.aliyun.com --find-links ./wheels
+				DOWNLOAD_STATUS=$?
+			fi
+		fi
+	fi
+
+	rm -f "${DOWNLOAD_LOG}"
+
+	if [[ ${DOWNLOAD_STATUS} -ne 0 ]]; then
 		echo "✗ Error: Failed to download dependencies"
 		exit 1
 	fi
